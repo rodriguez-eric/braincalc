@@ -47,3 +47,6 @@ Upload **all** website files from this folder to the published GitHub Pages root
 
 ## v1.1.2 startup diagnostic update
 The browser diagnostic now imports app.js (without initializing the UI). The homepage uses a versioned app.js import to avoid stale browser module caching. Also fixes Flanker import participant matching reference.
+
+## v1.1.3 startup fix
+Corrected a JavaScript syntax error in `app.js` (Flanker manual/Gorilla input rendering). The app module now passes strict ES-module syntax validation and a Node ES-module import smoke test. No scoring calculations were changed. Replace `app.js`, `index.html`, and `browser-test.html` in the GitHub Pages root; refresh the site.

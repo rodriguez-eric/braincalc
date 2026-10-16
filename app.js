@@ -36,7 +36,55 @@ function assessment(root){let p=person(),s=session(),a=assess(aid),id=aid,st=sta
  function choiceRow(container,k,label,opts){let row=el('div',{class:'rowinputs'});row.append(el('div',{html:label}));let ch=el('div',{class:'choices'});for(let [v,l]of opts){let b=el('button',{class:'choice '+(String(a.responses[k])===String(v)?'selected':''),text:l,onclick:()=>{let next=String(a.responses[k])===String(v)?'':v;if(updateResponse(k,next)){for(let x of ch.children)x.classList.toggle('selected',x===b&&next!=='')}}});ch.append(b)}row.append(ch);container.append(row)}
  function renderRows(container,id,a,n,kind){if(id==='ciqol')container.append(el('div',{class:'hint',text:'Responses: Never = 1, Rarely = 2, Sometimes = 3, Often = 4, Always = 5. Reverse scoring is automatic.'}));if(id==='pi'||id==='ffi')container.append(el('div',{class:'hint',text:'SD = Strongly Disagree · D = Disagree · N = Neutral · A = Agree · SA = Strongly Agree. Missing responses are imputed as Neutral for scoring, while exports preserve blanks.'}));let opts=kind==='ciqol'?[[1,'Never'],[2,'Rarely'],[3,'Sometimes'],[4,'Often'],[5,'Always']]:kind==='Likert'?[[0,'SD'],[1,'D'],[2,'N'],[3,'A'],[4,'SA']]:Array.from({length:kind==='0to5'?6:5},(_,i)=>[i,String(i)]);for(let i=1;i<=n;i++){let item=META[id]?.[i-1];let domain=id==='ciqol'?Object.keys(CI_DOMAINS).find(d=>d!=='Global'&&CI_DOMAINS[d].includes(i)):item?.facet||item?.domain||'';choiceRow(container,i,`<b>Item ${i}</b> <small>${esc(domain)}</small>`,opts)}if(id==='cdrisc'){let row=el('div',{class:'flex'});row.append(el('label',{text:'Manual total (optional):'}));let m=el('input',{type:'number',min:'0',max:'100',value:a.responses.total??''});m.onchange=()=>{let v=m.value;if(v!==''&&(!Number.isInteger(Number(v))||Number(v)<0||Number(v)>100)){alert('Manual CD-RISC total must be a whole number 0–100.');m.value='';return}a.manual=v!=='';updateResponse('total',v)};row.append(m);container.append(row)}}
  function renderFFI(container,a){let grid=el('div',{class:'fivecols'});for(let domain of ['N','E','O','A','C']){let col=el('div',{class:'stack'});col.append(el('h3',{text:({N:'Neuroticism',E:'Extraversion',O:'Openness',A:'Agreeableness',C:'Conscientiousness'})[domain]}));for(let it of META.ffi.filter(x=>x.domain===domain)){let cell=el('div',{class:'minicell'});cell.append(el('small',{text:`Item ${it.n}`}));let ch=el('div',{class:'choices'});for(let [v,l]of [[0,'SD'],[1,'D'],[2,'N'],[3,'A'],[4,'SA']]){let b=el('button',{class:'choice '+(String(a.responses[it.n])===String(v)?'selected':''),text:l,onclick:()=>{let next=String(a.responses[it.n])===String(v)?'':v;if(updateResponse(it.n,next))for(let x of ch.children)x.classList.toggle('selected',x===b&&next!=='')}});ch.append(b)}cell.append(ch);col.append(cell)}grid.append(col)}container.append(grid)}
- function renderNumeric(container,id,a){let names=id==='stripes'?Array.from({length:8},(_,i)=>`Threshold ${i+1}`):id==='moca'?['MoCA raw score (0–30)']:FIELD_NAMES[id];let grid=el('div',{class:'grid'});names.forEach((label,i)=>{let k=i+1;let type=id==='stripes'||id==='flanker'?'number':'number';let field=inputField(label,k,a.responses[k]??'',v=>{if(!updateResponse(k,v)){field.querySelector('input').value=a.responses[k]??''}},type);let inp=field.querySelector('input');inp.step=id==='stripes'||id==='flanker'?'any':'1';inp.min=id==='stripes'?'0.0000001':'0';if(id==='tlx')inp.max=20;if(id==='moca')inp.max=30;if(id==='hads')inp.max=21;grid.append(field)});container.append(grid);if(id==='flanker'){container.append(el('div',{class:'hint',text:'Import a Gorilla task-jczz .xlsx or .csv export. Uses Block1–BlockN Zone1 test response events; practice/fixation excluded. Median RT includes correct trials ≥200 ms; accuracy includes all test trials (blank Correct = incorrect). Manual summary entry remains available.'}));let file=el('input',{type:'file',accept:'.xlsx,.csv'});file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{const rows=await readGorillaFile(f),result=calculateFlanker(rows,person()?.id);let detail=Object.entries(result.counts).map(([t,c])=>`${t}: ${c.correct}/${c.trials} correct, ${c.rtEligible} eligible RTs`).join('\n');let preview=Object.entries(result.responses).map(([k,v])=>`${FIELD_NAMES.flanker[Number(k)-1]}: ${v}`).join('\n');if(!confirm(`Import Gorilla data for ${result.participant}?\n\n${detail}\n\n${preview}\n\n${result.allTrials} test trials; ${result.excludedPractice} practice trials excluded.\n\nThis replaces all seven Flanker summary fields and resets verification.`))return;a.responses={...a.responses,...result.responses};for(let k=1;k<=7)if(!(k in result.responses))delete a.responses[k];a.verified=false;a.verifier='';a.flags=(a.flags||[]).filter(x=>!x.startsWith('Gorilla import:'));a.notes=[a.notes,`Gorilla import: ${f.name}; ${result.allTrials} test trials; ${result.excludedPractice} practice trials excluded; ${detail.replaceAll('\n','; ')}`].filter(Boolean).join(' | ');touch();render()}catch(e){alert('Flanker import failed; scores unchanged. '+e.message)}finally{file.value=''}};container.append(file)}if(id==='stripes')container.append(el('p',{class:'hint',text:'Official score is the arithmetic mean of thresholds 5–8. Thresholds must be greater than zero.'}));if(id==='wais')container.append(el('p',{class:'hint',text:'Digit Span Composite is a study-specific mean of Forward, Backward, and Sequencing raw scores—not a WAIS standardized composite.'}));if(id==='tlx')container.append(el('p',{class:'hint',text:'NASA-TLX uses six unweighted integer scores 0–20. Composite = (sum ÷ 6) × 5.'}))}
+ function renderNumeric(container,id,a){
+  const names=id==='stripes'?Array.from({length:8},(_,i)=>`Threshold ${i+1}`):id==='moca'?['MoCA raw score (0–30)']:FIELD_NAMES[id];
+  const grid=el('div',{class:'grid'});
+  names.forEach((label,i)=>{
+    const k=i+1;
+    const field=inputField(label,k,a.responses[k]??'',v=>{
+      if(!updateResponse(k,v))field.querySelector('input').value=a.responses[k]??'';
+    },'number');
+    const inp=field.querySelector('input');
+    inp.step=id==='stripes'||id==='flanker'?'any':'1';
+    inp.min=id==='stripes'?'0.0000001':'0';
+    if(id==='tlx')inp.max=20;
+    if(id==='moca')inp.max=30;
+    if(id==='hads')inp.max=21;
+    grid.append(field);
+  });
+  container.append(grid);
+  if(id==='flanker'){
+    container.append(el('div',{class:'hint',text:'Import a Gorilla task-jczz .xlsx or .csv export. Uses Block1–BlockN Zone1 test response events; practice/fixation excluded. Median RT includes correct trials ≥200 ms; accuracy includes all test trials (blank Correct = incorrect). Manual summary entry remains available.'}));
+    const file=el('input',{type:'file',accept:'.xlsx,.csv'});
+    file.onchange=async()=>{
+      const f=file.files?.[0];
+      if(!f)return;
+      try{
+        const rows=await readGorillaFile(f);
+        const result=calculateFlanker(rows,person()?.id);
+        const detail=Object.entries(result.counts).map(([t,c])=>`${t}: ${c.correct}/${c.trials} correct, ${c.rtEligible} eligible RTs`).join('\n');
+        const preview=Object.entries(result.responses).map(([k,v])=>`${FIELD_NAMES.flanker[Number(k)-1]}: ${v}`).join('\n');
+        if(!confirm(`Import Gorilla data for ${result.participant}?\n\n${detail}\n\n${preview}\n\n${result.allTrials} test trials; ${result.excludedPractice} practice trials excluded.\n\nThis replaces all seven Flanker summary fields and resets verification.`))return;
+        a.responses={...a.responses,...result.responses};
+        for(let k=1;k<=7;k++)if(!(k in result.responses))delete a.responses[k];
+        a.verified=false;
+        a.verifier='';
+        a.flags=(a.flags||[]).filter(x=>!x.startsWith('Gorilla import:'));
+        a.notes=[a.notes,`Gorilla import: ${f.name}; ${result.allTrials} test trials; ${result.excludedPractice} practice trials excluded; ${detail.replaceAll('\n','; ')}`].filter(Boolean).join(' | ');
+        touch();
+        render();
+      }catch(e){
+        alert('Flanker import failed; scores unchanged. '+e.message);
+      }finally{
+        file.value='';
+      }
+    };
+    container.append(file);
+  }
+  if(id==='stripes')container.append(el('p',{class:'hint',text:'Official score is the arithmetic mean of thresholds 5–8. Thresholds must be greater than zero.'}));
+  if(id==='wais')container.append(el('p',{class:'hint',text:'Digit Span Composite is a study-specific mean of Forward, Backward, and Sequencing raw scores—not a WAIS standardized composite.'}));
+  if(id==='tlx')container.append(el('p',{class:'hint',text:'NASA-TLX uses six unweighted integer scores 0–20. Composite = (sum ÷ 6) × 5.'}));
+}
  function renderAudiogram(container,a){let freqs=[250,500,1000,2000,3000,4000,6000,8000];for(let ear of ['R','L']){let section=el('div',{class:'panel stack'});section.append(el('h3',{text:ear==='R'?'Right ear':'Left ear'}));let key=ear+'_transducer';section.append(inputField('Transducer',key,a.responses[key]||'Inserts',v=>{a.responses[key]=v;a.verified=false;touch();refreshScore()},'text',['SF','Inserts','Headphones']));let grid=el('div',{class:'grid'});for(let f of freqs){let k=ear+'_'+f;let field=inputField(`${f} Hz (dB HL / NR / DNT)`,k,a.responses[k]??'',v=>{if(!updateResponse(k,v)){field.querySelector('input').value=a.responses[k]??''}});grid.append(field)}section.append(grid);container.append(section)}container.append(el('div',{class:'hint',text:'Sound-field (SF) is ear-specific only under the approved CI testing protocol. NR and DNT are distinct from blank. No PTA is calculated.'}));let svg=makeAudiogramSVG(a.responses);let box=el('div',{html:svg});container.append(box)}
 }
 function makeAudiogramSVG(r){let freq=[250,500,1000,2000,3000,4000,6000,8000],x=i=>55+i*63,y=v=>30+(Number(v)+10)*2.2;let out=['<svg class="audiogram" viewBox="0 0 560 355" xmlns="http://www.w3.org/2000/svg">','<rect width="560" height="355" fill="white"/>'];for(let db=-10;db<=120;db+=10){let yy=y(db);out.push(`<line x1="55" y1="${yy}" x2="496" y2="${yy}" stroke="#ddd"/><text x="45" y="${yy+4}" fill="#444" font-size="10" text-anchor="end">${db}</text>`)}freq.forEach((f,i)=>{let xx=x(i);out.push(`<line x1="${xx}" y1="30" x2="${xx}" y2="316" stroke="#eee"/><text x="${xx}" y="334" text-anchor="middle" fill="#444" font-size="10">${f>=1000?f/1000+'k':f}</text>`)});for(let [ear,color] of [['R','#d53a44'],['L','#3675d6']]){let prev=null;freq.forEach((f,i)=>{let v=r[ear+'_'+f];if(v===''||v===undefined||!Number.isFinite(Number(v)))return;let xx=x(i),yy=y(v);if(prev)out.push(`<line x1="${prev[0]}" y1="${prev[1]}" x2="${xx}" y2="${yy}" stroke="${color}" stroke-width="2"/>`);out.push(ear==='R'?`<circle cx="${xx}" cy="${yy}" r="5" stroke="${color}" stroke-width="2" fill="white"/>`:`<path d="M${xx-5},${yy-5} l10,10 m0,-10 l-10,10" stroke="${color}" stroke-width="2"/>`);prev=[xx,yy]})}out.push('<text x="15" y="18" fill="#444" font-size="11">dB HL</text><text x="340" y="18" fill="#d53a44" font-size="11">○ Right</text><text x="430" y="18" fill="#3675d6" font-size="11">× Left</text></svg>');return out.join('')}
