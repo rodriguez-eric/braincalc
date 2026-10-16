@@ -1,0 +1,22 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+import {score,blank,validate,status,VERSION} from './scoring.js';
+import {calculateFlanker,parseCSV} from './flanker-import.js';import {makeWorkbook} from './excel.js';
+const meta=JSON.parse(fs.readFileSync(new URL('./scoring-data.json',import.meta.url)));
+const test=(id,res,expect)=>{let a=blank();a.responses=res;let s=score(id,a,meta);for(let[k,v]of Object.entries(expect))assert.equal(s.out[k],v,`${id}: ${k}`);return s};
+let seq=n=>Object.fromEntries(Array.from({length:n},(_,i)=>[i+1,0]));
+test('cdrisc',seq(25),{cdrisc_total:0});test('cdrisc',Object.fromEntries(Array.from({length:25},(_,i)=>[i+1,4])),{cdrisc_total:100});
+test('ffi',seq(60),{ffi_N_raw:meta.ffi.filter(x=>x.domain==='N'&&x.reverse).length*4});
+test('pi',seq(240),{pi_N_raw:meta.pi.filter(x=>x.domain==='N'&&x.reverse).length*4});
+test('stripes',Object.fromEntries(Array.from({length:8},(_,i)=>[i+1,i+1])),{stripes_official:6.5});
+test('tlx',Object.fromEntries(Array.from({length:6},(_,i)=>[i+1,20])),{tlx_sum:120,tlx_comp:100});
+test('lsns',Object.fromEntries(Array.from({length:18},(_,i)=>[i+1,5])),{lsns18_total:90,lsns6_total:30,lsnsr_total:60});
+test('vfs',Object.fromEntries(Array.from({length:40},(_,i)=>[i+1,4])),{vfs_total:160,vfs_emotional:40,vfs_social:40,vfs_cognitive:40,vfs_physical:40});
+test('hads',{1:8,2:10},{hads_total:18});test('wais',{1:3,2:6,3:9,4:12,5:6,6:6},{wais_ds_composite:9});test('flanker',{1:400,2:90,3:450,4:80,5:410,6:90,7:85},{flanker_interference_rt:50,flanker_interference_accuracy:10});
+let ci=Object.fromEntries(Array.from({length:35},(_,i)=>[i+1,1]));let sc=test('ciqol',ci,{});assert.equal(sc.out.ciqol_communication_raw,14);assert.equal(sc.out.ciqol_communication_converted,meta.ciqol.Communication[14]);
+assert(!validate('tlx',1,12.5));assert(validate('tlx',1,20));assert(!validate('stripes',1,0));assert(validate('audiogram','R_transducer','Inserts'));assert(!validate('audiogram','R_transducer','oops'));
+let missing=blank();missing.responses={1:1};assert.equal(score('ffi',missing,meta).complete,false);missing.ack=true;assert.equal(score('ffi',missing,meta).complete,true);
+assert.equal(status('ciqol',blank(),'NH',meta),'N/A');
+import {createRequire} from 'node:module';const require=createRequire(import.meta.url);globalThis.JSZip=require('./vendor/jszip.min.js');
+let a=blank();a.responses={1:25};let people=[{id:'C002',hearing:'CI',practice:false,demographics:{race:[]},sessions:[{id:'01',protocol:'OCEAN',date:'2026-10-16',assessments:{moca:a}}]}];let blob=await makeWorkbook(people,meta);let buf=Buffer.from(await blob.arrayBuffer());fs.writeFileSync(new URL('./test_export.xlsx',import.meta.url),buf);let zip=await JSZip.loadAsync(buf);assert.equal(Object.keys(zip.files).filter(x=>/^xl\/worksheets\/sheet\d+\.xml$/.test(x)).length,17);console.log('PASS scoring checks, source tables, NASA-TLX integer validation, 17-sheet Excel generation, '+VERSION);
+
+const gorilla=JSON.parse(fs.readFileSync(new URL('./flanker-regression-fixture.json',import.meta.url)));const fl=calculateFlanker(gorilla,'TEST001');assert.equal(fl.allTrials,144);assert.equal(fl.excludedPractice,16);assert.equal(fl.correctTrials,137);assert.equal(fl.responses[1],385.85);assert.equal(fl.responses[3],402.3);assert.equal(fl.responses[5],385);assert.equal(fl.responses[2],95.8333);assert.equal(fl.responses[4],89.5833);assert.equal(fl.responses[6],100);assert.equal(fl.responses[7],95.1389);assert.equal(fl.rtInterference,16.45);assert.equal(fl.accuracyInterference,6.25);assert.throws(()=>calculateFlanker(gorilla,'DIFFERENT'));assert.equal(parseCSV('Participant Public ID,display\n"A,1",Block1')[0]['Participant Public ID'],'A,1');console.log('PASS Gorilla regression: 144 test, 16 practice, RT/accuracy/interference');
