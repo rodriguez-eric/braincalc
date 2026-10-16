@@ -43,3 +43,7 @@ The site uses the provided BRAiN Lab circular logo (`brain-lab-logo.png`) and th
 
 ## v1.1.1 startup diagnostics
 Upload **all** website files from this folder to the published GitHub Pages root, including `browser-test.html`. Open `https://<username>.github.io/<repo>/browser-test.html` to check missing dependencies and JavaScript module imports. The homepage now shows a descriptive startup error rather than remaining on Loading indefinitely. This patch does not change scoring calculations.
+
+
+## v1.1.2 startup diagnostic update
+The browser diagnostic now imports app.js (without initializing the UI). The homepage uses a versioned app.js import to avoid stale browser module caching. Also fixes Flanker import participant matching reference.
