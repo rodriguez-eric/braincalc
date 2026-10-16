@@ -1,1 +1,11 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>BRAiN Lab Measure Calculator</title><link rel="stylesheet" href="styles.css"></head><body><div id="app"><div class="boot">Loading BRAiN Lab Measure Calculator…</div></div><script src="vendor/jszip.min.js"></script><script type="module" src="app.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>BRAiN Lab Measure Calculator</title><link rel="stylesheet" href="styles.css"></head><body><div id="app"><div class="boot">Loading BRAiN Lab Measure Calculator…</div></div><script src="vendor/jszip.min.js"></script><script>
+(function(){
+  const boot=document.querySelector('#app');
+  const show=(message)=>{if(!boot || !boot.querySelector('.boot'))return;boot.innerHTML='';const wrap=document.createElement('div');wrap.className='empty';const h=document.createElement('h2');h.textContent='Unable to start BRAiN Lab Measure Calculator';const msg=document.createElement('p');msg.textContent=message;const hint=document.createElement('p');hint.textContent='Check that all files from the ZIP were uploaded together, then open browser-test.html for a detailed diagnostic.';wrap.append(h,msg,hint);boot.append(wrap)};
+  window.addEventListener('error',e=>show('Startup error: '+(e.message||'A required script could not load.')));
+  window.addEventListener('unhandledrejection',e=>show('Startup error: '+String(e.reason?.message||e.reason||'Unknown error')));
+  const fallback=setTimeout(()=>show('The application did not finish loading within 12 seconds. Open browser-test.html to diagnose the missing or blocked dependency.'),12000);
+  window.addEventListener('braincalc-ready',()=>clearTimeout(fallback),{once:true});
+  window.braincalcStartupError=show;
+})();
+</script><script type="module">import('./app.js').catch(e=>window.braincalcStartupError?.('Module import failed: '+e.message));</script></body></html>
